@@ -206,24 +206,24 @@
             <div class="stat-card p-3">
               <div class="d-flex justify-content-between align-items-center">
                 <div>
-                  <span class="text-muted small text-uppercase fw-bold">Aptos Pagamento (🟢)</span>
+                  <span class="text-muted small text-uppercase fw-bold">Ativos (🟢)</span>
                   <h3 class="mb-0 fw-bold mt-1 text-success" id="dashTotalVerdes">0</h3>
                 </div>
                 <div class="bg-success-subtle text-success p-3 rounded-circle"><i class="bi bi-check-circle-fill fs-4"></i></div>
               </div>
-              <div class="small text-muted mt-2">Sem pendências no mês</div>
+              <div class="small text-muted mt-2">Contratos em vigência</div>
             </div>
           </div>
           <div class="col-md-4">
             <div class="stat-card p-3">
               <div class="d-flex justify-content-between align-items-center">
                 <div>
-                  <span class="text-muted small text-uppercase fw-bold">Com Pendência (🔴)</span>
+                  <span class="text-muted small text-uppercase fw-bold">Rescindidos (🔴)</span>
                   <h3 class="mb-0 fw-bold mt-1 text-danger" id="dashTotalVermelhos">0</h3>
                 </div>
                 <div class="bg-danger-subtle text-danger p-3 rounded-circle"><i class="bi bi-exclamation-triangle-fill fs-4"></i></div>
               </div>
-              <div class="small text-muted mt-2">Excluídos do memorando</div>
+              <div class="small text-muted mt-2">Contratos encerrados</div>
             </div>
           </div>
           <span id="dashValorApto" class="d-none"></span>
@@ -261,9 +261,8 @@
                       <tr>
                         <th>Setor</th>
                         <th class="text-center">Total Estagiários</th>
-                        <th class="text-center">🟢 Aptos</th>
-                        <th class="text-center">🔴 Pendentes</th>
-                        <th>Total Bolsas</th>
+                        <th class="text-center">🟢 Ativos</th>
+                        <th class="text-center">🔴 Rescindido</th>
                       </tr>
                     </thead>
                     <tbody id="tabelaSetoresDash"></tbody>
@@ -764,15 +763,31 @@ create policy "Permitir tudo memorandos" on memorandos for all using (true) with
             <div class="row g-2 mb-2">
               <div class="col-md-3">
                 <label class="form-label small fw-bold" for="estBanco">Banco</label>
-                <input type="text" id="estBanco" class="form-control form-control-sm" placeholder="ex: Caixa">
+                <select id="estBanco" class="form-select form-select-sm">
+                  <option value="">Selecione...</option>
+                  <option value="001 - Banco do Brasil">001 - Banco do Brasil</option>
+                  <option value="033 - Santander">033 - Santander</option>
+                  <option value="104 - Caixa Econômica Federal">104 - Caixa Econômica Federal</option>
+                  <option value="237 - Bradesco">237 - Bradesco</option>
+                  <option value="341 - Itaú Unibanco">341 - Itaú Unibanco</option>
+                  <option value="260 - Nubank">260 - Nubank</option>
+                  <option value="077 - Banco Inter">077 - Banco Inter</option>
+                  <option value="336 - C6 Bank">336 - C6 Bank</option>
+                  <option value="290 - PagBank (PagSeguro)">290 - PagBank (PagSeguro)</option>
+                  <option value="323 - Mercado Pago">323 - Mercado Pago</option>
+                  <option value="380 - PicPay">380 - PicPay</option>
+                  <option value="655 - Banco Votorantim (BV)">655 - Banco Votorantim (BV)</option>
+                  <option value="748 - Sicredi">748 - Sicredi</option>
+                  <option value="756 - Sicoob">756 - Sicoob</option>
+                </select>
               </div>
               <div class="col-md-3">
                 <label class="form-label small fw-bold" for="estAgencia">Agência</label>
-                <input type="text" id="estAgencia" class="form-control form-control-sm" placeholder="0000">
+                <input type="text" id="estAgencia" class="form-control form-control-sm" placeholder="0000" inputmode="numeric" oninput="this.value=this.value.replace(/[^0-9]/g,'')" maxlength="6">
               </div>
               <div class="col-md-3">
                 <label class="form-label small fw-bold" for="estConta">Conta</label>
-                <input type="text" id="estConta" class="form-control form-control-sm" placeholder="00000-0">
+                <input type="text" id="estConta" class="form-control form-control-sm" placeholder="00000-0" inputmode="numeric" oninput="this.value=this.value.replace(/[^0-9-]/g,'')" maxlength="12">
               </div>
               <div class="col-md-3">
                 <label class="form-label small fw-bold" for="estChavePix">Chave PIX</label>
@@ -1020,6 +1035,7 @@ create policy "Permitir tudo memorandos" on memorandos for all using (true) with
   <script>
     // 1. SETORES DO GABINETE
     const SETORES = [
+      "Gabinete do Prefeito",
       "PROCON",
       "Controladoria",
       "Juventude",
@@ -1882,8 +1898,8 @@ create policy "Permitir tudo memorandos" on memorandos for all using (true) with
       if (dashSub) {
         dashSub.innerHTML = `<i class="bi bi-people-fill text-primary me-1"></i><strong>${totalAtivos}</strong> ativos | <strong>${totalRescindidos}</strong> desligados`;
       }
-      document.getElementById("dashTotalVerdes").textContent = totalVerdes;
-      document.getElementById("dashTotalVermelhos").textContent = totalVermelhos;
+      document.getElementById("dashTotalVerdes").textContent = totalAtivos;
+      document.getElementById("dashTotalVermelhos").textContent = totalRescindidos;
       document.getElementById("dashValorApto").textContent = formatarMoeda(valorApto);
 
       // Atualiza badges de contagem na navegação
@@ -1916,25 +1932,11 @@ create policy "Permitir tudo memorandos" on memorandos for all using (true) with
           return !st.startsWith("rescind") && !st.startsWith("inat") && e.rescisao === null;
         });
 
-        let verdesSetor = 0;
-        let vermelhosSetor = 0;
-        let bolsaSetor = 0;
-
-        estsAtivosDoSetor.forEach(e => {
-          const sem = calcularSemaforo(e, comp);
-          if (sem.ignorarFolha) return;
-          if (sem.apto) {
-            verdesSetor++;
-            bolsaSetor += e.valorBolsa;
-          } else {
-            vermelhosSetor++;
-          }
-        });
+        const rescindidosSetor = estsDoSetor.length - estsAtivosDoSetor.length;
 
         sumTotalEstagiarios += estsDoSetor.length;
-        sumAptos += verdesSetor;
-        sumPendentes += vermelhosSetor;
-        sumBolsas += bolsaSetor;
+        sumAptos += estsAtivosDoSetor.length;
+        sumPendentes += rescindidosSetor;
 
         const tr = document.createElement("tr");
         tr.innerHTML = `
@@ -1944,9 +1946,8 @@ create policy "Permitir tudo memorandos" on memorandos for all using (true) with
               ${estsDoSetor.length}
             </span>
           </td>
-          <td class="text-center"><span class="badge ${verdesSetor > 0 ? 'badge-verde' : 'bg-light text-muted'}">${verdesSetor}</span></td>
-          <td class="text-center"><span class="badge ${vermelhosSetor > 0 ? 'badge-vermelho' : 'bg-light text-muted'}">${vermelhosSetor}</span></td>
-          <td class="fw-semibold text-primary">${formatarMoeda(bolsaSetor)}</td>
+          <td class="text-center"><span class="badge ${estsAtivosDoSetor.length > 0 ? 'badge-verde' : 'bg-light text-muted'}">${estsAtivosDoSetor.length}</span></td>
+          <td class="text-center"><span class="badge ${rescindidosSetor > 0 ? 'badge-vermelho' : 'bg-light text-muted'}">${rescindidosSetor}</span></td>
         `;
         tbodySetores.appendChild(tr);
       });
@@ -1958,7 +1959,6 @@ create policy "Permitir tudo memorandos" on memorandos for all using (true) with
             <td class="text-center"><span class="badge bg-dark">${sumTotalEstagiarios}</span></td>
             <td class="text-center"><span class="badge badge-verde">${sumAptos}</span></td>
             <td class="text-center"><span class="badge badge-vermelho">${sumPendentes}</span></td>
-            <td class="fw-bold text-primary">${formatarMoeda(sumBolsas)}</td>
           </tr>
         `;
       }
