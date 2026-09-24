@@ -98,13 +98,14 @@
       cursor: pointer;
     }
     @media print {
+      @page { margin: 12mm; }
       body * {
         visibility: hidden;
       }
-      #areaMemorandoImpressao, #areaMemorandoImpressao * {
+      .printavel, .printavel * {
         visibility: visible;
       }
-      #areaMemorandoImpressao {
+      .printavel {
         position: absolute;
         left: 0;
         top: 0;
@@ -181,6 +182,9 @@
       </li>
       <li class="nav-item" role="presentation">
         <button class="nav-link" id="tab-memorandos" data-bs-toggle="tab" data-bs-target="#view-memorandos" type="button" role="tab"><i class="bi bi-file-earmark-text-fill me-1"></i> Memorandos</button>
+      </li>
+      <li class="nav-item">
+        <button class="nav-link" id="tab-relatorio" data-bs-toggle="tab" data-bs-target="#view-relatorio" type="button" role="tab" onclick="renderRelatorioMensal()"><i class="bi bi-card-text me-1"></i> Relatório Mensal</button>
       </li>
     </ul>
 
@@ -476,13 +480,26 @@
                 <div class="d-flex gap-2">
                   <button class="btn btn-sm btn-outline-primary" onclick="abrirModalEditarTextoMemorando()" title="Personalizar o texto padrão dos parágrafos do memorando"><i class="bi bi-pencil-square me-1"></i>Modificar Texto Padrão</button>
                   <button class="btn btn-sm btn-outline-secondary" onclick="imprimirMemorando()"><i class="bi bi-printer me-1"></i>Imprimir / PDF</button>
+                  <button class="btn btn-sm btn-outline-danger d-none" id="btnExcluirMemo" onclick="excluirMemorandoSelecionado()"><i class="bi bi-trash3 me-1"></i>Excluir</button>
                 </div>
               </div>
               <div class="card-body bg-secondary-subtle p-3">
                 <!-- Folha de visualização do Memorando -->
-                <div id="areaMemorandoImpressao" class="doc-memo mx-auto"></div>
+                <div id="areaMemorandoImpressao" class="doc-memo mx-auto printavel"></div>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RELATÓRIO MENSAL -->
+      <div class="tab-pane fade" id="view-relatorio" role="tabpanel">
+        <div class="text-end mb-2">
+          <button class="btn btn-sm btn-outline-primary" onclick="window.print()"><i class="bi bi-printer me-1"></i>Imprimir / Exportar PDF</button>
+        </div>
+        <div class="card border-0 shadow-sm">
+          <div class="card-body p-4">
+            <div id="areaRelatorioMensal" class="small printavel" style="line-height: 1.8;"></div>
           </div>
         </div>
       </div>
@@ -559,6 +576,9 @@ alter table estagiarios add column if not exists banco text;
 alter table estagiarios add column if not exists agencia text;
 alter table estagiarios add column if not exists conta text;
 alter table estagiarios add column if not exists chave_pix text;
+
+-- Impede CPFs duplicados no banco (rode só depois de remover duplicados existentes, se houver)
+-- alter table estagiarios add constraint estagiarios_cpf_unique unique (cpf);
 
 -- 2. TABELA DE MEMORANDOS
 create table if not exists memorandos (
@@ -1059,6 +1079,7 @@ create policy "Permitir tudo memorandos" on memorandos for all using (true) with
     function mostrarApp() {
       document.getElementById("telaLogin").style.display = "none";
       document.getElementById("appConteudo").style.display = "";
+      carregarDados();
     }
     async function fazerLogout() {
       await supabaseClient.auth.signOut();
@@ -2365,7 +2386,7 @@ create policy "Permitir tudo memorandos" on memorandos for all using (true) with
         historicoMemorandos.forEach((memo, idx) => {
           const a = document.createElement("a");
           a.href = "javascript:void(0)";
-          a.className = `list-group-item list-group-item-action ${idx === 0 ? 'active' : ''}`;
+          a.className = `list-group-item list-group-item-action`;
           a.dataset.memoIdx = idx;
           a.onclick = () => {
             listGroup.querySelectorAll('.list-group-item').forEach(el => el.classList.remove('active'));
@@ -2375,7 +2396,7 @@ create policy "Permitir tudo memorandos" on memorandos for all using (true) with
           a.innerHTML = `
             <div class="d-flex w-100 justify-content-between align-items-center">
               <h6 class="mb-1 fw-bold">${memo.numero}</h6>
-              <small class="${idx === 0 ? 'text-light' : 'text-muted'}">${memo.data}</small>
+              <small class="text-muted">${memo.data}</small>
             </div>
             <div class="small">Competência: <strong>${memo.competencia}</strong> | ${memo.qtdAptos} estagiários</div>
             <div class="small fw-semibold mt-1">Valor: ${formatarMoeda(memo.valorTotal)}</div>
@@ -2384,7 +2405,12 @@ create policy "Permitir tudo memorandos" on memorandos for all using (true) with
         });
       }
 
-      atualizarPreviaMemorando(competenciaAtual);
+      memoSelecionadoAtual = null;
+      const btnExcluir = document.getElementById("btnExcluirMemo");
+      if (btnExcluir) btnExcluir.classList.add("d-none");
+      if (historicoMemorandos.length > 0) {
+        atualizarPreviaMemorando(competenciaAtual);
+      }
     }
 
     // GESTÃO DE TEXTO PERSONALIZADO DO MEMORANDO
@@ -2506,6 +2532,22 @@ create policy "Permitir tudo memorandos" on memorandos for all using (true) with
       container.innerHTML = aptos.map((e, idx) => montarHtmlMemorandoIndividual(e, dados, idx)).join("");
     }
 
+    function renderRelatorioMensal() {
+      const comp = competenciaAtual;
+      const aptos = estagiarios.filter(e => calcularSemaforo(e, comp).apto);
+
+      const [mes, ano] = comp.split("/");
+      const container = document.getElementById("areaRelatorioMensal");
+      let html = `<p>Na competência mensal <strong>${mes}/${ano}</strong>, os estagiários abaixo (os ativos e com folha de pagamento anexada no período) estão aptos para envio de memorando de pagamento para a Secretaria de Finanças.</p>`;
+
+      if (aptos.length === 0) {
+        html += `<p class="text-muted">Nenhum estagiário apto nesta competência.</p>`;
+      } else {
+        html += `<ol>${aptos.map(e => `<li>${e.nome} — ${e.setor}</li>`).join("")}</ol>`;
+      }
+      container.innerHTML = html;
+    }
+
     function atualizarPreviaMemorando(comp) {
       const aptos = estagiarios.filter(e => calcularSemaforo(e, comp).apto);
       const cab = obterCabecalhoMemoSalvo();
@@ -2520,7 +2562,11 @@ create policy "Permitir tudo memorandos" on memorandos for all using (true) with
       });
     }
 
+    let memoSelecionadoAtual = null;
     function selecionarMemorandoVisualizacao(memo) {
+      memoSelecionadoAtual = memo;
+      const btnExcluir = document.getElementById("btnExcluirMemo");
+      if (btnExcluir) btnExcluir.classList.remove("d-none");
       const conteudo = memo.conteudo || {};
       const aptosBase = conteudo.aptos || [];
       // Usa os dados do estagiário atual quando existir (mantém anexos/edições atualizadas), senão usa o congelado no memo
@@ -2534,6 +2580,28 @@ create policy "Permitir tudo memorandos" on memorandos for all using (true) with
         responsavel: memo.responsavel || "",
         cargo: memo.cargo || conteudo.cargo || "Prefeito Municipal"
       });
+    }
+
+    async function excluirMemorandoSelecionado() {
+      if (!memoSelecionadoAtual) {
+        alert("Selecione um memorando no histórico para excluir.");
+        return;
+      }
+      if (!confirm(`Deseja realmente excluir o memorando ${memoSelecionadoAtual.numero}? Esta ação não pode ser desfeita.`)) return;
+
+      const memo = memoSelecionadoAtual;
+      if (supabaseClient && memo.id) {
+        try {
+          await supabaseClient.from('memorandos').delete().eq('id', memo.id);
+        } catch (err) {
+          console.error("Erro ao excluir memorando no Supabase:", err);
+        }
+      }
+      historicoMemorandos = historicoMemorandos.filter(m => m !== memo);
+      memoSelecionadoAtual = null;
+      salvarLocalBackup();
+      renderMemorandos();
+      mostrarToastSucesso("Memorando excluído com sucesso!");
     }
 
     // 11. MODAL GERAR MEMORANDO (TRAVA AUTOMÁTICA OBRIGATÓRIA)
@@ -3174,6 +3242,19 @@ create policy "Permitir tudo memorandos" on memorandos for all using (true) with
       modal.show();
     }
 
+    // Validação real do CPF (dígitos verificadores)
+    function cpfValido(cpfDigitos) {
+      if (!/^\d{11}$/.test(cpfDigitos) || /^(\d)\1{10}$/.test(cpfDigitos)) return false;
+      let soma = 0;
+      for (let i = 0; i < 9; i++) soma += parseInt(cpfDigitos[i]) * (10 - i);
+      let d1 = (soma * 10) % 11; if (d1 === 10) d1 = 0;
+      if (d1 !== parseInt(cpfDigitos[9])) return false;
+      soma = 0;
+      for (let i = 0; i < 10; i++) soma += parseInt(cpfDigitos[i]) * (11 - i);
+      let d2 = (soma * 10) % 11; if (d2 === 10) d2 = 0;
+      return d2 === parseInt(cpfDigitos[10]);
+    }
+
     async function salvarEstagiario() {
       const id = document.getElementById("estId").value;
       const nome = document.getElementById("estNome").value.trim();
@@ -3200,12 +3281,19 @@ create policy "Permitir tudo memorandos" on memorandos for all using (true) with
       }
 
       const cpfDigitos = cpfBruto.replace(/\D/g, "");
-      if (cpfDigitos.length !== 11) {
-        alert("Por favor, informe um CPF brasileiro válido com 11 dígitos no formato 000.000.000-00.");
+      if (!cpfValido(cpfDigitos)) {
+        alert("CPF inválido. Verifique os números digitados.");
         document.getElementById("estCpf").focus();
         return;
       }
       const cpf = formatarCPF(cpfDigitos);
+
+      const jaExiste = estagiarios.some(e => String(e.id) !== String(id) && e.cpf.replace(/\D/g, "") === cpfDigitos);
+      if (jaExiste) {
+        alert("Já existe um estagiário cadastrado com este CPF.");
+        document.getElementById("estCpf").focus();
+        return;
+      }
 
       if (valorBolsa <= 0) {
         alert("Por favor, informe um valor válido em Real para a bolsa (ex: R$ 1.200,00).");
@@ -4359,7 +4447,6 @@ create policy "Permitir tudo memorandos" on memorandos for all using (true) with
       }
       popularSelectSetores();
       initSupabase();
-      carregarDados();
       checarSessaoLogin();
     });
   </script>
