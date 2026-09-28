@@ -76,43 +76,116 @@
       box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.2);
     }
     .doc-memo {
-      background: #ffffff;
-      border: 1px solid #cbd5e1;
-      padding: 40px;
-      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+      background: transparent;
+      border: none;
+      padding: 0;
+      box-shadow: none;
       font-family: Arial, sans-serif;
       font-size: 11pt;
       color: #000;
     }
-    .memo-pagina + .memo-pagina {
-      margin-top: 30px;
-      padding-top: 30px;
-      border-top: 2px dashed #cbd5e1;
+    .memo-pagina {
+      width: 210mm;
+      min-height: 297mm;
+      max-width: 100%;
+      margin: 0 auto;
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      padding: 14mm 18mm;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.12);
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
     }
-    @media print {
-      .memo-pagina {
-        page-break-after: always;
-      }
+    .memo-pagina + .memo-pagina {
+      margin-top: 24px;
     }
     .cursor-pointer {
       cursor: pointer;
     }
     @media print {
-      @page { margin: 12mm; }
-      body * {
-        visibility: hidden;
+      @page {
+        size: A4 portrait;
+        margin: 0mm;
       }
-      .printavel, .printavel * {
-        visibility: visible;
+      html, body {
+        width: 210mm !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #ffffff !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
       }
+      #telaLogin,
+      .navbar,
+      #bannerSupabaseInfo,
+      #appTabs,
+      .modal,
+      .modal-backdrop,
+      .toast-container,
+      .card-header,
+      .btn,
+      #view-memorandos .col-lg-5,
+      #view-relatorio > .text-end,
+      .tab-pane:not(.active) {
+        display: none !important;
+      }
+      #appConteudo,
+      .container-fluid,
+      .tab-content,
+      .tab-pane.active,
+      #view-memorandos .row,
+      #view-memorandos .col-lg-7,
+      #view-memorandos .card,
+      #view-memorandos .card-body,
+      #view-relatorio .card,
+      #view-relatorio .card-body,
+      .doc-memo,
       .printavel {
-        position: absolute;
-        left: 0;
-        top: 0;
-        width: 100%;
-        box-shadow: none;
-        border: none;
-        padding: 0;
+        display: block !important;
+        position: static !important;
+        width: 100% !important;
+        max-width: none !important;
+        height: auto !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: none !important;
+        box-shadow: none !important;
+        background: #ffffff !important;
+        overflow: visible !important;
+      }
+      .memo-pagina {
+        width: 210mm !important;
+        height: 296.5mm !important;
+        min-height: 296.5mm !important;
+        max-height: 296.5mm !important;
+        padding: 14mm 18mm !important;
+        margin: 0 auto !important;
+        border: none !important;
+        box-shadow: none !important;
+        box-sizing: border-box !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: flex-start !important;
+        page-break-after: always !important;
+        break-after: page !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+        overflow: hidden !important;
+        background: #ffffff !important;
+      }
+      .memo-pagina + .memo-pagina {
+        margin-top: 0 !important;
+      }
+      .memo-pagina:last-child {
+        page-break-after: auto !important;
+        break-after: auto !important;
+      }
+      #areaRelatorioMensal {
+        width: 210mm !important;
+        padding: 15mm 20mm !important;
+        box-sizing: border-box !important;
       }
     }
   </style>
@@ -182,9 +255,6 @@
       </li>
       <li class="nav-item" role="presentation">
         <button class="nav-link" id="tab-memorandos" data-bs-toggle="tab" data-bs-target="#view-memorandos" type="button" role="tab"><i class="bi bi-file-earmark-text-fill me-1"></i> Memorandos</button>
-      </li>
-      <li class="nav-item">
-        <button class="nav-link" id="tab-relatorio" data-bs-toggle="tab" data-bs-target="#view-relatorio" type="button" role="tab" onclick="renderRelatorioMensal()"><i class="bi bi-card-text me-1"></i> Relatório Mensal</button>
       </li>
     </ul>
 
@@ -488,18 +558,6 @@
                 <div id="areaMemorandoImpressao" class="doc-memo mx-auto printavel"></div>
               </div>
             </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- RELATÓRIO MENSAL -->
-      <div class="tab-pane fade" id="view-relatorio" role="tabpanel">
-        <div class="text-end mb-2">
-          <button class="btn btn-sm btn-outline-primary" onclick="window.print()"><i class="bi bi-printer me-1"></i>Imprimir / Exportar PDF</button>
-        </div>
-        <div class="card border-0 shadow-sm">
-          <div class="card-body p-4">
-            <div id="areaRelatorioMensal" class="small printavel" style="line-height: 1.8;"></div>
           </div>
         </div>
       </div>
@@ -2512,8 +2570,8 @@ create policy "Permitir tudo memorandos" on memorandos for all using (true) with
           <div class="small mb-1">AGÊNCIA: ${e.agencia || ""}</div>
           <div class="small mb-1">CONTA: ${e.conta || ""}</div>
           <div class="small mb-3">CHAVE PIX: ${e.chavePix || ""}</div>
-          <div class="small text-justify mt-4 mb-5" style="line-height: 1.6;">${obterTextoMemorandoFechamento(e, dados.competencia)}</div>
-          <div class="text-center pt-4 mt-4" style="max-width: 320px; margin: 0 auto;">
+          <div class="small text-justify mt-4 mb-4" style="line-height: 1.6;">${obterTextoMemorandoFechamento(e, dados.competencia)}</div>
+          <div class="text-center pt-4" style="max-width: 320px; margin: auto auto 0 auto;">
             <p class="fw-bold mb-0 small text-uppercase">${dados.responsavel || "-"}</p>
             <p class="text-muted mb-0" style="font-size: 0.8rem;">${dados.cargo || "-"}</p>
             <p class="text-muted mb-0" style="font-size: 0.8rem;">Salgueiro-PE</p>
@@ -2530,22 +2588,6 @@ create policy "Permitir tudo memorandos" on memorandos for all using (true) with
         return;
       }
       container.innerHTML = aptos.map((e, idx) => montarHtmlMemorandoIndividual(e, dados, idx)).join("");
-    }
-
-    function renderRelatorioMensal() {
-      const comp = competenciaAtual;
-      const aptos = estagiarios.filter(e => calcularSemaforo(e, comp).apto);
-
-      const [mes, ano] = comp.split("/");
-      const container = document.getElementById("areaRelatorioMensal");
-      let html = `<p>Na competência mensal <strong>${mes}/${ano}</strong>, os estagiários abaixo (os ativos e com folha de pagamento anexada no período) estão aptos para envio de memorando de pagamento para a Secretaria de Finanças.</p>`;
-
-      if (aptos.length === 0) {
-        html += `<p class="text-muted">Nenhum estagiário apto nesta competência.</p>`;
-      } else {
-        html += `<ol>${aptos.map(e => `<li>${e.nome} — ${e.setor}</li>`).join("")}</ol>`;
-      }
-      container.innerHTML = html;
     }
 
     function atualizarPreviaMemorando(comp) {
